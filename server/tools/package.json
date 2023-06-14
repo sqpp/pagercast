@@ -1,0 +1,14 @@
+{
+  "name": "pagercast-tools",
+  "version": "1.0.0",
+  "description": "PagerCast tools to generate admin password, etc",
+  "main": "index.js",
+  "scripts": {
+    "changepass": "./changepass.sh"
+  },
+  "author": "Marcell Csendes",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3"
+  }
+}
