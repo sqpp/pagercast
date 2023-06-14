@@ -2,10 +2,17 @@
 
 PagerCast is a network based pager service for RetroGadgets with public database and many features.
 
-## Recommended IDE Setup
+## Features
 
+- (WebSocket) Socket.io Support.
+- Receive Messages in your gadgets.
+- Send Messages from Web.
+- Privacy Support (Public / Friends / Only Me).
 
-## Type Support for `.vue` Imports in TS
+## Upcoming
+
+- CloudPager 
+- Twillio Support 
 
 
 ## Customize configuration
