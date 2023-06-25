@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+@import url(../assets/fonts/MotorolaScreentype.ttf);
+    .font-mono-screen {
+      font-family: MotorolaScreenType, monospace;
+    }
+  }

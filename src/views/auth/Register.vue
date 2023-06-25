@@ -1,9 +1,9 @@
 <template>
-  <div id="app" class="flex justify-center w-full text-gray-100 ">
-    <div id="registration" class="flex flex-col items-center justify-center w-full max-w-screen-md text-center md:w-auto md:max-w-7xl">
-      <form action="" class="w-full">
+  <div id="app" class="flex w-full mt-20 text-gray-100 md:max-w-4xl lg:max-w-5xl xl:max-w-7xl ">
+    <div id="registration" class="flex flex-col w-full ">
+      <form action="" class="">
         <div id="registration-form"
-          class="flex flex-col px-4 py-8 bg-gray-900 rounded-md md:flex-row ">
+          class="flex flex-col px-4 py-4 bg-gray-900 rounded-md md:flex-row ">
           <Register />
         </div>
       </form>

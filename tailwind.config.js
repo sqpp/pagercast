@@ -7,7 +7,17 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        mono: ['Ubuntu Mono', 'monospace'],
+        mono: ['Ubuntu Mono', 'MotorolaScreenType', 'monospace'], // Add more font names here
+      },
+      keyframes: {
+        flashing: {
+          '0%': { backgroundColor: 'rgba(255, 0, 0, 0.3)' }, // Lighter background color
+          '50%': { backgroundColor: 'rgba(255, 50, 50, 1)' }, // Original background color
+          '100%': { backgroundColor: 'rgba(255, 0, 0, 0.3)' }, // Lighter background color
+        },
+      },
+      animation: {
+        'ping-fast': 'flashing 0.5s infinite', // Adjust the animation duration
       },
     },
   },
@@ -15,4 +25,4 @@ module.exports = {
     require('@tailwindcss/forms'),
     require('@tailwindcss/aspect-ratio'),
   ],
-}
+};

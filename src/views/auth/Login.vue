@@ -1,8 +1,12 @@
 <template>
-  <div id="login">
-      <input type="text"  placeholder="OK"> 
-  </div>
+ <Login></Login>
 </template>
 
-<script setup lang="ts">
+<script lang="ts">
+import Login from '@/components/auth/Login.vue';
+export default {
+  components: {
+    Login
+  },
+};
 </script>

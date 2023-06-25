@@ -3,7 +3,7 @@
 
 import { defineComponent } from 'vue';
 import { socket, state } from '@/socket';
-
+import { notify } from '@kyvg/vue3-notification';
 export default defineComponent({
     data() {
         return {
@@ -63,8 +63,12 @@ export default defineComponent({
         },
         verifyCode() {
             // Send code to server for verification
-            console.log('Verify started', this.regCode);
-            socket.emit('verifyCode', this.regCode);
+            if (this.regCode.trim() === '') {
+                // Handle form validation error
+                notify({ text: "Please fill out all the details", type: "error" });
+            } else {
+                socket.emit('verifyCode', this.regCode);
+            }
         },
         handleDeviceSelection() {
             // Reset the serial number when the device selection changes
@@ -113,8 +117,8 @@ export default defineComponent({
 </script>
 
 <template>
-    <div class="grid flex-col grid-cols-1 grid-rows-3 gap-4 text-left md:grid-cols-2">
-
+    <notifications  pauseOnHover=true draggable=true draggablePercent=0.6 icon=true />
+    <div class="grid flex-col grid-cols-1 grid-rows-3 gap-4 mx-4 text-left md:grid-cols-2">
         <div class="flex flex-col">
             <label for="device" class="py-2">Pager Model*</label>
             <select required
@@ -218,16 +222,18 @@ export default defineComponent({
             </div>
 
             <div class="mt-2 w-54">
-                <div class="px-4 py-2 text-red-500 bg-red-200">{{ authError }}</div>
+                <div v-if="authError" class="px-4 py-2 my-2 text-center text-red-500 bg-red-200 rounded-md">{{ authError }}
+                </div>
                 <button @click.prevent="verifyCode" class="w-full px-3 py-2 bg-green-500 rounded-md">
                     Register Product
                 </button>
             </div>
 
+
         </div>
 
     </div>
-    <div class="flex flex-col w-64 h-full mx-8">
+    <div class="flex flex-col w-64 h-full mx-4">
         <p class="py-2">Preview:</p>
         <div v-if="selectedDevice">
             <div v-for="device in devices" :key="device.name">
