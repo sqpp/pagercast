@@ -1,10 +1,31 @@
+
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-@import url(../assets/fonts/MotorolaScreentype.ttf);
-    .font-mono-screen {
-      font-family: MotorolaScreenType, monospace;
-    }
+  @font-face {
+    font-family: 'MotorolaScreentype';
+    src: url('./fonts/MotorolaScreentype.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
   }
+}
+
+:root {
+  --tw-border-opacity: 1;
+  --toast-success-bg: rgb(55 65 81 / var(--tw-border-opacity));;
+  --toast-error-bg: rgb(55 65 81 / var(--tw-border-opacity));;
+  --toast-warning-bg: rgb(55 65 81 / var(--tw-border-opacity));;
+  --toast-info-bg: rgb(55 65 81 / var(--tw-border-opacity));;
+}
+
+.Toastify__toast-theme--dark {
+  background-color:  var(--toast-success-bg) !important;
+}
+
+.Toastify__toast-container--top-right {
+  top: 7% !important;
+
+}

@@ -3,22 +3,32 @@
 
 import { defineComponent } from 'vue';
 import { socket, state } from '@/socket';
-import { notify } from '@kyvg/vue3-notification';
+import { toast } from "vue3-toastify";
+import 'vue3-toastify/dist/index.css';
+import { type } from 'os';
+
+
+
+
 export default defineComponent({
     data() {
         return {
+            isLoading: !state.connected, // Indicates if Socket.IO is loading or not
             devices: [] as any[],
             phoneNumbers: [] as any[],
+            isInvalidSerialNumber: false,
+            serialNumberPlaceholder: '',
+            // Registration Details
+            serialNumber: '',
             selectedPhoneNumber: '',
             selectedSound: '',
             selectedDevice: '',
-            serialNumber: '',
-            isInvalidSerialNumber: false,
-            serialNumberPlaceholder: '',
             privacySelector: '',
             regCode: '',
-            verified: '',
-            authError: ''
+            pinCode: '', // Set the initial value as number
+            twillioRequest: 0,
+            registrationResponse: ''
+            
         };
     },
     computed: {
@@ -34,23 +44,29 @@ export default defineComponent({
         isSerialNumberDisabled() {
             return !this.selectedDevice;
         },
+
         selectedDeviceData() {
             return this.devices.find((device: any) => device.name === this.selectedDevice);
         }
     },
     mounted() {
         this.$nextTick(() => {
+            //this.setupSocketConnection();
             this.fetchPhoneNumbers();
             this.fetchDevices();
         });
+
     },
     methods: {
+
         fetchPhoneNumbers() {
             socket.emit('getFreeNumbers');
             socket.on("freeNumbers", (Numbers) => {
                 this.phoneNumbers = Numbers;
             });
         },
+
+       
         fetchDevices() {
             socket.emit('getDevices');
             socket.on("listDevices", (deviceList) => {
@@ -61,19 +77,49 @@ export default defineComponent({
             const audio = new Audio(this.selectedSound);
             audio.play();
         },
-        verifyCode() {
-            // Send code to server for verification
-            if (this.regCode.trim() === '') {
-                // Handle form validation error
-                notify({ text: "Please fill out all the details", type: "error" });
+
+        registerUser() {
+            // Check if all required fields are filled
+            if (
+                this.selectedDevice &&
+                this.serialNumber &&
+                this.selectedPhoneNumber &&
+                this.pinCode &&
+                this.selectedSound &&
+                this.privacySelector &&
+                this.regCode
+            ) {
+                // Perform user registration on the backend
+                const user = {
+                    phoneNumber: this.selectedPhoneNumber,
+                    pin: this.pinCode,
+                    device: this.selectedDevice,
+                    serialNumber: this.serialNumber,
+                    ringtone: this.selectedSound,
+                    privacy: this.privacySelector,
+                    twillio: this.twillioRequest,
+                    registrationCode: this.regCode
+                };
+                socket.emit('register', user)
+                socket.on('registerCallback', (response) => {
+                this.registrationResponse = response;
+                });
             } else {
-                socket.emit('verifyCode', this.regCode);
+                // Show error message or validation feedback
+                toast.error('Please fill in all required fields!', {
+                    position: toast.POSITION.TOP_CENTER,
+                    theme: 'dark',
+                    toastId: 'missingFields',
+                });
             }
         },
+
+
         handleDeviceSelection() {
             // Reset the serial number when the device selection changes
             this.serialNumber = '';
         },
+
         formatSerialNumber() {
             let value = this.serialNumber.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -104,20 +150,41 @@ export default defineComponent({
                 this.isInvalidSerialNumber = true;
             }
             this.serialNumber = value;
-        }
+        },
+        handleInput(event: Event) {
+            const input = event.target as HTMLInputElement;
+            const numericValue = input.value.replace(/\D/g, ""); // Remove non-numeric characters
+            this.pinCode = numericValue; // Assign the filtered numeric value to the pinCode property
+        },
     },
     watch: {
-        selectedDevice(newDevice: any) {
-            const device = this.devices.find((device: any) => device.name === newDevice);
-            console.log(device);
-            this.serialNumberPlaceholder = device.serial + '-XXXXXX';
-        }
+  selectedDevice(newDevice) {
+    const device = this.devices.find((device) => device.name === newDevice);
+    this.serialNumberPlaceholder = device.serial + '-XXXXXX';
+  },
+  registrationResponse(newResponse) {
+    if (newResponse) {
+      if (newResponse.success) {
+        toast.success('You have been registered successfully!', {
+            position: toast.POSITION.TOP_CENTER,
+                    theme: 'dark',
+                    toastId: 'missingFields',
+        },
+        );
+      } else {
+        toast.error('Registration failed due to an error!', {
+            position: toast.POSITION.TOP_CENTER,
+                    theme: 'dark',
+                    toastId: 'missingFields',
+        });
+      }
     }
+  }
+},
 });
 </script>
 
 <template>
-    <notifications  pauseOnHover=true draggable=true draggablePercent=0.6 icon=true />
     <div class="grid flex-col grid-cols-1 grid-rows-3 gap-4 mx-4 text-left md:grid-cols-2">
         <div class="flex flex-col">
             <label for="device" class="py-2">Pager Model*</label>
@@ -163,9 +230,9 @@ export default defineComponent({
 
         <div class="flex flex-col">
             <label for="pin" class="py-2">Your PIN*</label>
-            <input required type="password" autocomplete="new-password" maxlength="4"
+            <input required type="text" pattern="[0-9]" inputmode="numeric" autocomplete="new-password" maxlength="4"
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
-                title="pin" name="pin" id="pin" placeholder="8717 (4 Chars Numeric)">
+                title="pin" name="pin" id="pin" @input="handleInput" v-model="pinCode" placeholder="8717 (4 Chars Numeric)">
         </div>
 
         <div class="flex flex-col ">
@@ -222,9 +289,8 @@ export default defineComponent({
             </div>
 
             <div class="mt-2 w-54">
-                <div v-if="authError" class="px-4 py-2 my-2 text-center text-red-500 bg-red-200 rounded-md">{{ authError }}
-                </div>
-                <button @click.prevent="verifyCode" class="w-full px-3 py-2 bg-green-500 rounded-md">
+
+                <button @click.prevent="registerUser" class="w-full px-3 py-2 bg-green-500 rounded-md">
                     Register Product
                 </button>
             </div>

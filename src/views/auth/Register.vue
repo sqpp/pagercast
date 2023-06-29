@@ -1,5 +1,5 @@
 <template>
-  <div id="app" class="flex w-full mt-20 text-gray-100 md:max-w-4xl lg:max-w-5xl xl:max-w-7xl ">
+  <div id="app" class="flex w-full mt-32 text-gray-100 md:max-w-4xl lg:max-w-5xl xl:max-w-5xl ">
     <div id="registration" class="flex flex-col w-full ">
       <form action="" class="">
         <div id="registration-form"

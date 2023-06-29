@@ -3,7 +3,7 @@ import Home from'../views/Home.vue'
 import Login from '../views/auth/Login.vue'
 import Register from '../views/auth/Register.vue'
 import Database from '../views/Database.vue'
-import Devices from '../views/devices/Pager.vue'
+import Devices from '../views/devices/Devices.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,9 +29,10 @@ const router = createRouter({
       component: Register
     },
     {
-      path: '/device/:pagerId:',
-      name: 'Devices',
+      path: '/device/:pagerId',
+      name: 'Device',
       component: Devices,
+      props: true,
     },
   ]
 })
