@@ -24,6 +24,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
+
 router.get('/numbers', async (req, res) => {
   const isFree = req.query.free === '1';
   if (isFree) {
