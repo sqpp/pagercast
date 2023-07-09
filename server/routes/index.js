@@ -5,7 +5,7 @@ const requestIp = require('request-ip');
 const { lookup } = require('geoip-lite');
 
 dotenv.config()
-var pool = require('../mysql');
+var pool = require('../postgres');
 
 
 var express = require('express');

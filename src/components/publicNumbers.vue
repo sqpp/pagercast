@@ -8,11 +8,12 @@
         <th class="px-1 text-left md:w-32">Country</th>
         <th class="px-1 text-left md:w-32">Network</th>
         <th class="px-1 text-left md:w-32">Active</th>
+        <th class="px-1 text-left md:w-32">Last Seen</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody> 
       <tr v-for="number in publicNumbers" :key="number.id">
-        <td class="px-1 ">{{ number.phone }}</td>
+        <td :class="number.premium ? `text-yellow-300 font-medium before:content-['⭐']` : 'text-gray-300'" class="justify-center px-1 ">{{ number.phone }}</td>
         <td class="inline-block w-24 px-1 truncate md:w-32">{{ number.owner_name }}</td>
         <td>{{ number.country }}</td>
         <td class="inline-block w-16 px-1 truncate md:w-32">{{ number.network_name }}</td>
@@ -22,6 +23,11 @@
             'inline-flex px-1 text-red-500 rounded-md bg-red-500/30': !number.status
           }">
             {{ getOnlineStatus(number.status) }}
+          </span>
+        </td>
+        <td>
+          <span>
+            <span></span>
           </span>
         </td>
       </tr>
@@ -50,6 +56,8 @@
 
 <script lang="ts">
 import { socket } from "@/socket";
+import * as moment from 'moment';
+
 interface NumberData {
   id: string;
   phone: string;
@@ -57,6 +65,8 @@ interface NumberData {
   country: string;
   network_name: string;
   status: boolean;
+  premium: boolean;
+  lastseen: Date;
 }
 
 export default {
@@ -75,7 +85,7 @@ export default {
     },
     getOnlineStatus(status: boolean): string {
       return status ? "Online" : "Offline";
-    }
+    },
   },
   mounted() {
     this.fetchDevices(); // Fetch devices when the component is mounted

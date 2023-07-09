@@ -2,17 +2,17 @@
 
 <template>
     <div class="flex flex-row justify-center w-full px-8 pt-32">
-        <form ref="loginForm" action=""
+        <form ref="loginForm" action="" @submit.prevent="handleFormSubmit"
             class="px-10 py-20 pt-10 bg-gray-900 rounded-lg lg:rounded-r-none lg:rounded-l-lg xl:py-20 w-96">
             <div id="title" class="text-center">
                 <span class="text-3xl font-bold">Login</span>
             </div>
             <div class="flex flex-col w-full pt-8">
-                <input type="tel" placeholder="Phone Number"
+                <input type="number" inputmode="numeric" pattern="[0-9]*" placeholder="Phone Number" v-model="phoneNumber"
                     class="inline-block w-full px-3 py-2 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950" />
             </div>
             <div class="flex flex-col w-full pt-2">
-                <input type="password" placeholder="PIN" maxlength="4"
+                <input type="password" placeholder="PIN" maxlength="4" v-model="pin"
                     class="w-full px-3 py-2 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950" />
             </div>
 
@@ -20,16 +20,17 @@
 
                 <input type="checkbox"
                     class="p-3 text-left text-green-500 border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-gray-950"
-                    title="rememberMe" name="rememberMe" id="rememberMe" placeholder="John Doe">
+                    title="rememberMe" name="rememberMe" v-model="rememberMe" id="rememberMe" placeholder="John Doe">
                 <label for="rememberMe" class="pl-2 text-sm text-gray-400 select-none">Remember Me</label>
             </div>
             <div class="h-captcha" data-theme="dark" data-sitekey="1a6eb7e2-aa17-49f1-85d0-3a19f17e0e8d"></div>
-            <button @click.prevent="() => Login"
+            <button type="submit"
                 class="block w-full py-2 mt-4 font-bold transition duration-500 bg-green-500 rounded-md select-none hover:ease-out hover:bg-green-400 active:bg-green-600 g-recaptcha"
-                data-sitekey="6LfLGNcmAAAAAO4fACH6S42GDU9FQ4_C-NhhCD1a" data-callback='onSubmit' data-action='submit'> LOGIN
+                data-sitekey="6LfLGNcmAAAAAO4fACH6S42GDU9FQ4_C-NhhCD1a" data-callback="onSubmit" data-action="submit"> LOGIN
             </button>
             <div class="flex items-center mt-4 text-sm text-gray-500">
-                <button @click.prevent="() => SKeyLogin" class="pr-1 text-blue-500 select-none hover:cursor-pointer"> Sign
+                <button @click.prevent="" class="pr-1 text-blue-500 select-none hover:cursor-pointer">
+                    Sign
                     in with a security key </button> <i class="mt-0.5 la la-question-circle la-lg"></i>
             </div>
             <div class="mt-4 text-xs text-gray-500">
@@ -76,46 +77,92 @@
         </div>
     </div>
 </template>
-
-   
+<style>
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+</style>
 <script lang="ts">
-
 import { defineComponent, ref } from 'vue';
-import { socket, state } from '@/socket';
-import { createPublicKey } from 'crypto';
+import { socket } from '@/socket';
+import router from '@/router/index'
+import { toast } from "vue3-toastify";
+import 'vue3-toastify/dist/index.css';
+import { io } from 'socket.io-client';
 
 export default defineComponent({
-    setup() {
-        const loginForm = ref<HTMLFormElement | null>(null);
-        const submitForm = () => {
-            if (loginForm.value) {
-                loginForm.value.submit();
-            }
-
-            return {
-                loginForm,
-                submitForm
-            }
-        };
-    },
     data() {
         return {
             phoneNumber: '',
-            pinCode: '',
-            tFa: '',
-            authError: '',
-            options: [] as any[],
-            token: '',
+            pin: '',
+            rememberMe: false,
+            loginResponse: null,
+        };
+    },
+    methods: {
+        async handleFormSubmit() {
+            if (!this.phoneNumber || !this.pin) {
+                toast.error('Phone Number and PIN are required for login!', {
+                    position: toast.POSITION.TOP_CENTER,
+                    theme: 'dark',
+                    toastId: 'missingFields',
+                });
+                return;
+            }
 
+            const data = {
+                phoneNumber: this.phoneNumber,
+                pin: this.pin,
+            };
+
+            socket.emit('/login', data);
         }
     },
-    computed: {
-        Login() {
-            console.log("Simple Login")
-        },
-        SKeyLogin() {
-            console.log("Security Key authoroziation")
-        }
-    },
+    watch: {
+        loginResponse(response) {
+            console.log(response)
+  if (response.isAuthenticated == true && response.error === false) {
+    // Handle successful login
+    toast.success('Success... Lets beep together!', {
+      position: toast.POSITION.TOP_CENTER,
+      theme: 'dark',
+      toastId: 'successLogin',
+    });
+    if (response.isFirstLogin === true) {
+      this.$router.push('/setup');
+    }
+  } else if (response.error === 'inCorrectPIN') {
+    // Incorrect PIN error
+    toast.error('Sorry. Incorrect PIN!', {
+      position: toast.POSITION.TOP_CENTER,
+      theme: 'dark',
+      toastId: 'incorrectPIN',
+    });
+  } else if (response.error === 'notFoundPhoneNumber') {
+    // Phone number not found error
+    toast.info('PhoneNumber is unknown!', {
+      position: toast.POSITION.TOP_CENTER,
+      theme: 'dark',
+      toastId: 'notFoundPhoneNumber',
+    });
+  } else {
+    // Other error scenarios
+    toast.warning('Oups.. Something went wrong!', {
+      position: toast.POSITION.TOP_CENTER,
+      theme: 'dark',
+      toastId: 'unknown',
+    });
+  }
+}
+
+
+},
+mounted() {
+  socket.on('/login/response', (data) => {
+    this.loginResponse = data;
+  });
+},
 });
 </script>

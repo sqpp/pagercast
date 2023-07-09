@@ -1,5 +1,5 @@
 <template>
-    <div class="flex items-center justify-center min-w-full mt-20">
+    <div class="flex items-center justify-center min-w-full mt-32">
       <public-numbers></public-numbers>
     </div>
   </template>

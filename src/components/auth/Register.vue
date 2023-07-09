@@ -1,15 +1,33 @@
    
 <script lang="ts">
 
-import { defineComponent } from 'vue';
+import { defineComponent , ref, h} from 'vue';
 import { socket, state } from '@/socket';
 import { toast } from "vue3-toastify";
 import 'vue3-toastify/dist/index.css';
 import { type } from 'os';
 
 
+interface User {
+    name: string;
+    serial: string;
+    number: string;
+    ringtone: string;
+    device: string;
+    privacy: string;
+    regcode: string;
+    pincode: string;
+    twillio: boolean;
+    registrationResponse: string;
+    authCodeVerified: boolean;
+    // Add more properties as needed
+}
 
-
+interface PhoneNumber {
+    number: string;
+    formatted: string;
+    premium: boolean;
+}
 export default defineComponent({
     data() {
         return {
@@ -18,17 +36,23 @@ export default defineComponent({
             phoneNumbers: [] as any[],
             isInvalidSerialNumber: false,
             serialNumberPlaceholder: '',
+
             // Registration Details
+            name: '',
             serialNumber: '',
             selectedPhoneNumber: '',
+            showPremiumNumbers: false,
+            selectedPremiumNumber: '',
+            formattedPremiumNumber: '',
             selectedSound: '',
             selectedDevice: '',
             privacySelector: '',
-            regCode: '',
-            pinCode: '', // Set the initial value as number
-            twillioRequest: 0,
-            registrationResponse: ''
-            
+            regcode: '',
+            pincode: '', // Set the initial value as number
+            twillio: false,
+            registrationResponse: '',
+            authCodeVerified: false
+
         };
     },
     computed: {
@@ -41,13 +65,29 @@ export default defineComponent({
                 };
             });
         },
+
+        formattedPremiumNumbers() {
+            return this.phoneNumbers.map((phoneNumber: any) => {
+                const formattedPremiumNumber = '+' + phoneNumber.number.toString().replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1.$2.$3.$4');
+                return {
+                    number: phoneNumber.number,
+                    formatted: formattedPremiumNumber
+                };
+            });
+        },
         isSerialNumberDisabled() {
             return !this.selectedDevice;
         },
 
         selectedDeviceData() {
             return this.devices.find((device: any) => device.name === this.selectedDevice);
-        }
+        },
+        filteredPhoneNumbers() {
+            return this.phoneNumbers.filter(phoneNumber => !phoneNumber.premium);
+        },
+        filteredPremiumNumbers() {
+            return this.phoneNumbers.filter(phoneNumber => phoneNumber.premium);
+        },
     },
     mounted() {
         this.$nextTick(() => {
@@ -61,12 +101,22 @@ export default defineComponent({
 
         fetchPhoneNumbers() {
             socket.emit('getFreeNumbers');
-            socket.on("freeNumbers", (Numbers) => {
-                this.phoneNumbers = Numbers;
+            socket.on("freeNumbers", (numbers: PhoneNumber[]) => {
+
+                this.phoneNumbers = numbers.map(phoneNumber => {
+                    const formattedNumber = '+' + phoneNumber.number.toString().replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1.$2.$3.$4');
+                    return {
+                        number: phoneNumber.number,
+                        formatted: formattedNumber,
+                        premium: phoneNumber.premium
+                    };
+                });
             });
         },
+        togglePremiumNumbers() {
+            this.showPremiumNumbers = !this.showPremiumNumbers;
+        },
 
-       
         fetchDevices() {
             socket.emit('getDevices');
             socket.on("listDevices", (deviceList) => {
@@ -78,32 +128,69 @@ export default defineComponent({
             audio.play();
         },
 
-        registerUser() {
+
+        checkCode(code: String) {
+            return new Promise((resolve, reject) => {
+                socket.emit('verifyCode', code);
+                socket.on('codeVerificationResult', (result) => {
+                    resolve(result);
+                });
+            });
+        },
+
+        async registerUser() {
             // Check if all required fields are filled
             if (
+                this.name &&
                 this.selectedDevice &&
                 this.serialNumber &&
-                this.selectedPhoneNumber &&
-                this.pinCode &&
+                (this.selectedPhoneNumber || this.selectedPremiumNumber) && // At least one number must be selected
+                this.pincode &&
                 this.selectedSound &&
                 this.privacySelector &&
-                this.regCode
+                this.regcode
             ) {
                 // Perform user registration on the backend
-                const user = {
-                    phoneNumber: this.selectedPhoneNumber,
-                    pin: this.pinCode,
-                    device: this.selectedDevice,
-                    serialNumber: this.serialNumber,
+                const user: User = {
+                    name: this.name,
+                    serial: this.serialNumber,
+                    number: this.showPremiumNumbers ? this.selectedPremiumNumber : this.selectedPhoneNumber,
                     ringtone: this.selectedSound,
+                    device: this.selectedDevice,
                     privacy: this.privacySelector,
-                    twillio: this.twillioRequest,
-                    registrationCode: this.regCode
+                    regcode: this.regcode,
+                    pincode: this.pincode,
+                    twillio: this.twillio,
+                    registrationResponse: '',
+                    authCodeVerified: false
                 };
-                socket.emit('register', user)
-                socket.on('registerCallback', (response) => {
-                this.registrationResponse = response;
-                });
+
+                try {
+                    const result = await this.checkCode(this.regcode) as { exists: boolean };
+                    if (result.exists) {
+                        // Registration code is correct, proceed with registration
+                        this.authCodeVerified = true;
+                        socket.emit('register', user);
+                        socket.on('registerCallback', (response) => {
+                            this.registrationResponse = response;
+                        });
+                    } else {
+                        // Registration code is incorrect, show warning message
+                        this.authCodeVerified = false;
+                        toast.warning('The registration code is incorrect', {
+                            position: toast.POSITION.TOP_CENTER,
+                            theme: 'dark',
+                            toastId: 'missingFields',
+                        });
+                    }
+                } catch (error) {
+                    console.error(error);
+                    toast.error('An error occurred during code verification.', {
+                        position: toast.POSITION.TOP_CENTER,
+                        theme: 'dark',
+                        toastId: 'missingFields',
+                    });
+                }
             } else {
                 // Show error message or validation feedback
                 toast.error('Please fill in all required fields!', {
@@ -113,7 +200,6 @@ export default defineComponent({
                 });
             }
         },
-
 
         handleDeviceSelection() {
             // Reset the serial number when the device selection changes
@@ -154,39 +240,52 @@ export default defineComponent({
         handleInput(event: Event) {
             const input = event.target as HTMLInputElement;
             const numericValue = input.value.replace(/\D/g, ""); // Remove non-numeric characters
-            this.pinCode = numericValue; // Assign the filtered numeric value to the pinCode property
+            this.pincode = numericValue; // Assign the filtered numeric value to the pinCode property
         },
     },
     watch: {
-  selectedDevice(newDevice) {
-    const device = this.devices.find((device) => device.name === newDevice);
-    this.serialNumberPlaceholder = device.serial + '-XXXXXX';
-  },
-  registrationResponse(newResponse) {
-    if (newResponse) {
-      if (newResponse.success) {
-        toast.success('You have been registered successfully!', {
-            position: toast.POSITION.TOP_CENTER,
-                    theme: 'dark',
-                    toastId: 'missingFields',
+        selectedDevice(newDevice) {
+            const device = this.devices.find((device) => device.name === newDevice);
+            this.serialNumberPlaceholder = device.serial + '-XXXXXX';
         },
-        );
-      } else {
-        toast.error('Registration failed due to an error!', {
-            position: toast.POSITION.TOP_CENTER,
-                    theme: 'dark',
-                    toastId: 'missingFields',
-        });
-      }
-    }
-  }
-},
+        registrationResponse(newResponse) {
+            console.log('registrationResponse:', newResponse); // Add this line to log the value of newResponse
+
+            if (newResponse) {
+                if (newResponse.success) {
+                    const successRegister =toast.success('You have been registered successfully!', {
+                        position: toast.POSITION.TOP_CENTER,
+                        theme: 'dark',
+                        toastId: 'missingFields',
+                        autoClose: 3000,
+                    });
+                    setTimeout(() => {
+                    toast.update(successRegister, {
+                        render: (props) => {
+                            console.log(props);
+                            return h('div', 'Redirecting to login in 3s...');
+                        },
+                        type: toast.TYPE.INFO,
+                        autoClose: 3000,
+                    })
+                    window.location.href = '/login';
+                }, 6000);
+                } else {
+                    toast.error('Registration failed due to an error!', {
+                        position: toast.POSITION.TOP_CENTER,
+                        theme: 'dark',
+                        toastId: 'missingFields',
+                    });
+                }
+            }
+        }
+    },
 });
 </script>
 
 <template>
-    <div class="grid flex-col grid-cols-1 grid-rows-3 gap-4 mx-4 text-left md:grid-cols-2">
-        <div class="flex flex-col">
+    <div class="grid flex-col grid-cols-1 grid-rows-3 gap-2 mx-4 text-left md:grid-cols-2">
+        <div class="flex flex-col max-w-80 lg:w-80">
             <label for="device" class="py-2">Pager Model*</label>
             <select required
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
@@ -198,7 +297,7 @@ export default defineComponent({
             </select>
         </div>
 
-        <div class="flex flex-col">
+        <div class="flex flex-col max-w-80 lg:w-80">
             <label for="serial-number" class="py-2">Pager Serial Number*</label>
             <input required type="text"
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
@@ -209,33 +308,58 @@ export default defineComponent({
 
         </div>
 
-        <div class="flex flex-col">
-            <label for="name" class="py-2">Your Name*</label>
+        <div class="flex flex-col max-w-80 lg:w-80">
+            <label for="name" class="py-1">Your Name*</label>
             <input required type="text"
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
-                title="name" name="name" id="name" placeholder="John Doe">
+                title="name" name="name" id="name" v-model="name" placeholder="John Doe">
         </div>
 
-        <div class="flex flex-col">
-            <label for="freeNumbers" class="py-2">Available Phone Numbers*</label>
-            <select required
-                class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
-                title="freeNumber" name="freeNumbers" v-model="selectedPhoneNumber" id="phoneNumber">
-                <option value="">Choose Your Number</option>
-                <option v-for="phoneNumber in formattedPhoneNumbers" :value="phoneNumber.number" :key="phoneNumber.number">
-                    {{ phoneNumber.formatted }}
-                </option>
-            </select>
+        <div class="flex flex-col max-w-80 lg:w-80">
+            <label for="freeNumbers" class="py-1">Available Phone Numbers*</label>
+
+            <div v-if="!showPremiumNumbers">
+                <select required :disabled="filteredPhoneNumbers.length === 0"
+                    class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
+                    title="freeNumber" name="freeNumbers" v-model="selectedPhoneNumber" id="phoneNumber">
+                    <option v-if="filteredPhoneNumbers.length === 0" selected value='' disabled>No available numbers</option>
+                    <option v-if="filteredPhoneNumbers.length > 0" value='' disabled>Choose Your Number</option>
+                    <option v-for="phoneNumber in filteredPhoneNumbers" :value="phoneNumber.number" :key="phoneNumber.id">{{
+                        phoneNumber.formatted }}</option>
+                  
+                </select>
+
+                <span class="mt-2 text-xs text-orange-400 hover:cursor-pointer" @click="showPremiumNumbers = true">
+                    <a>Looking for <strong>Premium numbers?</strong></a>
+                </span>
+            </div>
+            <div v-else>
+                <select :disabled="filteredPremiumNumbers.length === 0"
+                    class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none disabled:text-gray-600 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
+                    title="premiumNumber" name="premiumNumbers" v-model="selectedPremiumNumber" id="premiumNumber">
+                    <option v-if="filteredPremiumNumbers.length === 0" selected value='' disabled>No available premium numbers</option>
+                    <option v-for="phoneNumber in filteredPremiumNumbers" :value="phoneNumber.number" :key="phoneNumber.id">
+                        {{ phoneNumber.formatted }}
+                    </option>
+                </select>
+
+                <span class="mt-2 text-xs text-gray-400 hover:cursor-pointer" @click="showPremiumNumbers = false">
+                    <a>Switch back to regular numbers instead?</a>
+                </span>
+            </div>
+
+
         </div>
 
-        <div class="flex flex-col">
+
+        <div class="flex flex-col max-w-80 lg:w-80">
             <label for="pin" class="py-2">Your PIN*</label>
             <input required type="text" pattern="[0-9]" inputmode="numeric" autocomplete="new-password" maxlength="4"
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
-                title="pin" name="pin" id="pin" @input="handleInput" v-model="pinCode" placeholder="8717 (4 Chars Numeric)">
+                title="pin" name="pin" id="pin" @input="handleInput" v-model="pincode" placeholder="8717 (4 Chars Numeric)">
         </div>
 
-        <div class="flex flex-col ">
+        <div class="flex flex-col max-w-80 lg:w-80">
             <div class="flex items-center py-2 div">
                 <i class="las la-play"></i>
                 <label for="ringSelector" class="mx-2">Ringtone</label>
@@ -250,7 +374,7 @@ export default defineComponent({
             </select>
         </div>
 
-        <div class="flex flex-col">
+        <div class="flex flex-col max-w-80 lg:w-80">
             <label for="privacySelector" class="py-2">Privacy* (Who can send you message)</label>
             <select required
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
@@ -262,14 +386,14 @@ export default defineComponent({
             </select>
         </div>
 
-        <div class="flex flex-col">
+        <div class="flex flex-col max-w-80 lg:w-80">
             <label for="regCode" class="py-2">Registration Code*</label>
-            <input v-model="regCode" required type="password" autocomplete="new-password" maxlength="32"
+            <input v-model="regcode" required type="password" autocomplete="new-password" maxlength="32"
                 class="w-full px-3 py-2 pr-20 text-left border-gray-700 rounded-md shadow-sm appearance-none focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-50 bg-gray-950"
                 title="regCode" name="regCode" id="regCode" placeholder="Code from Retro Gadgets">
         </div>
 
-        <div class="flex flex-col ">
+        <div class="flex flex-col max-w-80 lg:w-80">
 
             <label for="twillio" class="py-2">Twillio Number (Paid Feature)</label>
             <div class="flex flex-row items-center -mt-1">
